@@ -1,0 +1,22 @@
+.bttn-pill.bttn-primary {
+    color: #fff !important;
+    background: #BB000E !important;
+}
+
+.bttn-pill.bttn-success {
+    color: #fff !important;
+    background: #E31C25 !important;
+}
+
+table.dataTable tr.active td, table.dataTable td.selected {
+    background-color: #E31C25 !important;
+}
+
+thead th {
+    font-size = 24pt !important
+}
+
+td {
+    color: #fff !important;
+
+}"
