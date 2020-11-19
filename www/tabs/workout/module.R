@@ -12,10 +12,11 @@ workout_ui <- function(id) {
     last_wo_table <- DTOutput(ns("last_wo_table"))
     begin_wo_bttn <- actionBttn(
         inputId = ns("begin_workout"),
-        label = "Begin Workout",
+        label = "\nBegin Workout\n",
         style = "pill",
         color = "success",
-        block = TRUE
+        block = TRUE,
+        size = 'lg'
     )
     
     choose_workout_ui <- fluidPage(
@@ -25,10 +26,11 @@ workout_ui <- function(id) {
     
     end_wo_bttn <- actionBttn(
         inputId = ns("end_workout"),
-        label = "End Workout",
+        label = "\nEnd Workout\n",
         style = "pill",
         color = "success",
-        block = TRUE
+        block = TRUE,
+        size = 'lg'
     )
     
     workout_ui <- fluidPage(
@@ -48,10 +50,11 @@ workout_ui <- function(id) {
     
     return_home_button <- actionBttn(
         inputId = ns("return_home"),
-        label = "Return Home",
+        label = "\nReturn Home\n",
         style = "pill",
         color = "success",
-        block = TRUE
+        block = TRUE,
+        size = "lg"
     )
     
     workout_summary_ui <- fluidPage(
@@ -100,7 +103,7 @@ workout_server <- function(id, con) {
                         dom = 't',
                         headerCallback = DT::JS(
                             "function(thead) {",
-                            "  $(thead).css('font-size', '24pt');",
+                            "  $(thead).css('font-size', '40pt');",
                             "  $(thead).css('color', '#fff');",
                             "}"
                         )
@@ -109,7 +112,7 @@ workout_server <- function(id, con) {
                 formatStyle(
                     columns = c(1, 2, 3),
                     fontWeight = "bold",
-                    fontSize = '18pt'
+                    fontSize = '30pt'
                 )
         })
         
@@ -207,7 +210,7 @@ workout_server <- function(id, con) {
                         
                         for (primary_lift_i in 1:nrow(primary_lifts)) {
                             primary_lift <- primary_lifts[primary_lift_i,]
-                            
+
                             lift_max <-
                                 tbl(con, "personal_records") %>%
                                 filter(
@@ -217,84 +220,15 @@ workout_server <- function(id, con) {
                                 collect() %>%
                                 magrittr::extract2(1)
                             
-                            primary_sets <- 
-                                primary_program %>% 
-                                mutate(
-                                    weight = as.integer(percent_of_max * lift_max),
-                                    weight = 5 * floor(weight / 5)
-                                )
-                            
-                            formatted_sets <- tibble()
-                            for (set_i in 1:nrow(primary_sets)) {
-                                n_sets <- primary_sets[[set_i, "set_goal"]]
-
-                                formatted_sets <- bind_rows(
-                                    formatted_sets,
-                                    tibble(
-                                        reps = rep(primary_sets[[set_i, "rep_goal"]], n_sets),
-                                        weight = rep(primary_sets[[set_i, "weight"]], n_sets)
-                                    )
-                                )
-                            }
-                            
-                            these_lifts <- list()
-                            for (i in 1:nrow(formatted_sets)) {
-                                reps <- formatted_sets[[i, "reps"]]
-                                lift_weight <- formatted_sets[[i, "weight"]]
-
-                                these_lifts[[i]] <- fluidRow(
-                                    column(
-                                        width = 6,
-                                        tags$h2(
-                                            glue('{reps} at {lift_weight}')
-                                        )
-                                    ),
-                                    column(
-                                        width = 6,
-                                        sliderInput(
-                                            inputId = paste0("main_1_", i),
-                                            label = "Reps Achieved",
-                                            min = 0,
-                                            max = reps,
-                                            value = 0,
-                                            step = 1,
-                                            animate = TRUE
-                                        )
-                                    )
-                                )
-                            }
-                            
-                            tabs[[primary_lift_i]] <- tabPanel(
-                                title = primary_lift$exercise_name,
-                                fluidPage(
-                                    br(),
-                                    fluidRow(
-                                        column(
-                                            width = 6,
-                                            box(
-                                                title = "This lift historically",
-                                                status = "primary",
-                                                solidHeader = TRUE,
-                                                collapsible = FALSE,
-                                                width = NULL,
-                                                plotOutput("main_lift")
-                                            )
-                                        ),
-                                        column(
-                                            width = 6,
-                                            box(
-                                                title = "Sets",
-                                                status = "primary",
-                                                solidHeader = TRUE,
-                                                collapsible = FALSE,
-                                                width = NULL,
-                                                do.call(fluidPage, these_lifts)
-                                            )
-                                        )
-                                    )
-                                )
+                            tabs[[primary_lift_i]] <- primary_lift_tab(
+                              id = id,
+                              exercise_name = primary_lift$exercise_name,
+                              lift_max = lift_max,
+                              primary_program = primary_program
                             )
                         }
+                        
+                        
                         
                         secondary_lift_sets <- tibble(
                             sets = c(3, 3, 2),
@@ -316,257 +250,24 @@ workout_server <- function(id, con) {
                             exercise_name = secondary_lifts_1[[secondary_lift_i, "exercise_name"]]
                           )
                         }
-                        # for (secondary_lift_i in 1:3) {
-                        #     sets <- secondary_lift_sets[[secondary_lift_i, "sets"]]
-                        #     reps <- secondary_lift_sets[[secondary_lift_i, "reps"]]
-                        #     
-                        #     formatted_sets <- tibble(
-                        #         reps = rep(reps, sets),
-                        #         weight = rep(20, sets)
-                        #     )
-                        #     
-                        #     
-                        #     these_lifts <- list()
-                        #     for (i in 1:nrow(formatted_sets)) {
-                        #         reps <- formatted_sets[[i, "reps"]]
-                        #         lift_weight <- formatted_sets[[i, "weight"]]
-                        #         
-                        #         these_lifts[[i]] <- fluidRow(
-                        #             column(
-                        #                 width = 6,
-                        #                 tags$h2(
-                        #                     glue('{reps} at {lift_weight}')
-                        #                 )
-                        #             ),
-                        #             column(
-                        #                 width = 6,
-                        #                 sliderInput(
-                        #                     inputId = paste0("secondary_1_", i),
-                        #                     label = "Reps Achieved",
-                        #                     min = 0,
-                        #                     max = reps,
-                        #                     value = 0,
-                        #                     step = 1,
-                        #                     animate = TRUE
-                        #                 )
-                        #             )
-                        #         )
-                        #     }
-                        #     
-                        #     secondary_lift <- secondary_lifts_1[secondary_lift_i, ]
-                        #     
-                        #     tabs[[secondary_lift_i + 2]] <- tabPanel(
-                        #         title = secondary_lift$exercise_name,
-                        #         fluidPage(
-                        #             br(),
-                        #             fluidRow(
-                        #                 column(
-                        #                     width = 6,
-                        #                     box(
-                        #                         title = "This lift historically",
-                        #                         status = "primary",
-                        #                         solidHeader = TRUE,
-                        #                         collapsible = FALSE,
-                        #                         width = NULL,
-                        #                         plotOutput("secondary_lift")
-                        #                     )
-                        #                 ),
-                        #                 column(
-                        #                     width = 6,
-                        #                     box(
-                        #                         title = "Sets",
-                        #                         status = "primary",
-                        #                         solidHeader = TRUE,
-                        #                         collapsible = FALSE,
-                        #                         width = NULL,
-                        #                         do.call(fluidPage, these_lifts)
-                        #                     )
-                        #                 )
-                        #             )
-                        #         )
-                        #     )
-                        # }
                         
                         secondary_lifts_2 <-
-                            global$exercises %>% 
-                            filter(
-                                !primary_lift, 
-                                muscle_group_id == primary_muscle_groups[2]
-                            ) %>% 
-                            sample_n(3)
+                          global$exercises %>% 
+                          filter(
+                            !primary_lift, 
+                            muscle_group_id == primary_muscle_groups[2]
+                          ) %>% 
+                          sample_n(3)
                         for (secondary_lift_i in 1:3) {
-                            sets <- secondary_lift_sets[[secondary_lift_i, "sets"]]
-                            reps <- secondary_lift_sets[[secondary_lift_i, "reps"]]
-                            
-                            formatted_sets <- tibble(
-                                reps = rep(reps, sets),
-                                weight = rep(20, sets)
-                            )
-                            
-                            
-                            these_lifts <- list()
-                            for (i in 1:nrow(formatted_sets)) {
-                                reps <- formatted_sets[[i, "reps"]]
-                                lift_weight <- formatted_sets[[i, "weight"]]
-                                
-                                these_lifts[[i]] <- fluidRow(
-                                    column(
-                                        width = 6,
-                                        tags$h2(
-                                            glue('{reps} at {lift_weight}')
-                                        )
-                                    ),
-                                    column(
-                                        width = 6,
-                                        sliderInput(
-                                            inputId = paste0("secondary_2_", i),
-                                            label = "Reps Achieved",
-                                            min = 0,
-                                            max = reps,
-                                            value = 0,
-                                            step = 1,
-                                            animate = TRUE
-                                        )
-                                    )
-                                )
-                            }
-                            
-                            secondary_lift <- secondary_lifts_2[secondary_lift_i, ]
-                            
-                            tabs[[secondary_lift_i + 5]] <- tabPanel(
-                                title = secondary_lift$exercise_name,
-                                fluidPage(
-                                    br(),
-                                    fluidRow(
-                                        column(
-                                            width = 6,
-                                            box(
-                                                title = "This lift historically",
-                                                status = "primary",
-                                                solidHeader = TRUE,
-                                                collapsible = FALSE,
-                                                width = NULL,
-                                                plotOutput("secondary_lift")
-                                            )
-                                        ),
-                                        column(
-                                            width = 6,
-                                            box(
-                                                title = "Sets",
-                                                status = "primary",
-                                                solidHeader = TRUE,
-                                                collapsible = FALSE,
-                                                width = NULL,
-                                                do.call(fluidPage, these_lifts)
-                                            )
-                                        )
-                                    )
-                                )
-                            )
+                          tabs[[secondary_lift_i + 5]] <- secondary_lift_tab(
+                            id = id,
+                            sets = secondary_lift_sets[[secondary_lift_i, "sets"]],
+                            reps = secondary_lift_sets[[secondary_lift_i, "reps"]],
+                            exercise_name = secondary_lifts_2[[secondary_lift_i, "exercise_name"]]
+                          )
                         }
                         
-                        
                         do.call(tabsetPanel, tabs)
-                        
-                        # primary_program <- 
-                        #     tbl(con, "program_steps") %>% 
-                        #     filter(program_id == 1, workout_number == 1) %>% 
-                        #     arrange(step_number) %>% 
-                        #     select(set_goal, rep_goal, percent_of_max) %>% 
-                        #     collect()
-                        # 
-                        # lift <-
-                        #     global$exercises %>% 
-                        #     filter(
-                        #         primary_lift, 
-                        #         muscle_group_id == primary_muscle_groups[1]
-                        #     ) 
-                        # 
-                        # lift_max <- 
-                        #     tbl(con, "personal_records") %>% 
-                        #     filter(exercise_id == !!lift$exercise_id) %>% 
-                        #     select(weight) %>% 
-                        #     collect() %>% 
-                        #     magrittr::extract2(1)
-                        # 
-                        # y <- primary_program %>% 
-                        #     mutate(
-                        #         weight = as.integer(percent_of_max * lift_max),
-                        #         weight = 5 * floor(weight / 5)
-                        #     )
-                        # 
-                        # test<- tibble()
-                        # for (set_i in 1:nrow(y)) {
-                        #     n_sets <- y[[set_i, "set_goal"]]
-                        #     
-                        #     test <- bind_rows(
-                        #         test,
-                        #         tibble(
-                        #             reps = rep(y[[set_i, "rep_goal"]], n_sets),
-                        #             weight = rep(y[[set_i, "weight"]], n_sets)
-                        #         )
-                        #     )
-                        # }
-                        # 
-                        # these_lifts <- list()
-                        # for (i in 1:nrow(test)) {
-                        #     reps <- test[[i, "reps"]]
-                        #     lift_weight <- test[[i, "weight"]]
-                        #     
-                        #     these_lifts[[i]] <- fluidRow(
-                        #         column(
-                        #             width = 6,
-                        #             tags$h2(
-                        #                 glue('{reps} at {lift_weight}')
-                        #             )
-                        #         ),
-                        #         column(
-                        #             width = 6,
-                        #             sliderInput(
-                        #                 inputId = paste0("main_1_", i),
-                        #                 label = "Reps Achieved",
-                        #                 min = 0,
-                        #                 max = reps,
-                        #                 value = 0,
-                        #                 step = 1,
-                        #                 animate = TRUE
-                        #             )
-                        #         )
-                        #     )
-                        # }
-                        # 
-                        # tabsetPanel(
-                        #     tabPanel(
-                        #         title = lift$exercise_name,
-                        #         fluidPage(
-                        #             br(),
-                        #             fluidRow(
-                        #                 column(
-                        #                     width = 6,
-                        #                     box(
-                        #                         title = "This lift historically",
-                        #                         status = "primary",
-                        #                         solidHeader = TRUE,
-                        #                         collapsible = FALSE,
-                        #                         width = NULL,
-                        #                         plotOutput("main_lift")
-                        #                     )
-                        #                 ),
-                        #                 column(
-                        #                     width = 6, 
-                        #                     box(
-                        #                         title = "Sets",
-                        #                         status = "primary",
-                        #                         solidHeader = TRUE,
-                        #                         collapsible = FALSE,
-                        #                         width = NULL,
-                        #                         do.call(fluidPage, these_lifts)
-                        #                     )
-                        #                 )
-                        #             )
-                        #         )
-                        #     )
-                        # )
                         
                     })
                     
