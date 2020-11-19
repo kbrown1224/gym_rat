@@ -36,7 +36,7 @@ primary_lift_tab <- function(id, exercise_name, lift_max, primary_program) {
             column(
                 width = 6,
                 sliderInput(
-                    inputId = ns(paste0("main_1_", i)),
+                    inputId = paste0(exercise_name, "_", i),
                     label = "Reps Achieved",
                     min = 0,
                     max = reps,
@@ -62,7 +62,7 @@ primary_lift_tab <- function(id, exercise_name, lift_max, primary_program) {
                             solidHeader = TRUE,
                             collapsible = FALSE,
                             width = NULL,
-                            plotOutput("main_lift")
+                            plotOutput(ns("exercise_name"))
                         )
                     ),
                     column(
@@ -106,7 +106,7 @@ secondary_lift_tab <- function(id, sets, reps, exercise_name) {
             column(
                 width = 6,
                 sliderInput(
-                    inputId = paste0("secondary_1_", i),
+                    inputId = ns(paste0(str_to_lower(str_replace_all(exercise_name, " ", "_")), "_", i)),
                     label = "Reps Achieved",
                     min = 0,
                     max = reps,
@@ -132,7 +132,7 @@ secondary_lift_tab <- function(id, sets, reps, exercise_name) {
                             solidHeader = TRUE,
                             collapsible = FALSE,
                             width = NULL,
-                            plotOutput(ns("secondary_lift"))
+                            plotOutput(ns("exercise_name"))
                         )
                     ),
                     column(

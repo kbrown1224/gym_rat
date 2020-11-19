@@ -57,11 +57,6 @@ workout_menu <- menuItem(
     tabName = "workout_page",
     icon = icon("home")
 )
-# pred_menu <- menuItem(
-#     text = "Predictions",
-#     tabName = "prediction_page",
-#     icon = icon("baseball-ball")
-# )
 
 # Put Menu in the Sidebar
 db_left_sidebar <- dashboardSidebar(
@@ -71,14 +66,6 @@ db_left_sidebar <- dashboardSidebar(
 #### Define Body ===============================================================
 # Define Tab Items
 workout_tab <- tabItem(tabName = "workout_page", workout_ui("workout_module"))
-# pred_tab <- tabItem(
-#     tabName = "prediction_page", 
-#     prediction_ui(
-#         id = "prediction_page", 
-#         pitcher_choices = pitcher_choices, 
-#         batter_choices = batter_choices
-#     )
-# )
 
 # Define the body object
 db_body <- dashboardBody(

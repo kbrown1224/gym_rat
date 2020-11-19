@@ -78,7 +78,10 @@ workout_server <- function(id, con) {
     workout_server_function <- function(input, output, session) {
         global <- reactiveValues(
             workout_id = NULL,
-            exercises = NULL
+            exercises = NULL,
+            primary_program = NULL,
+            primary_lifts = NULL,
+            secondary_lifts = NULL
         )
         
         last_wo_df <- reactive({
@@ -205,6 +208,8 @@ workout_server <- function(id, con) {
                             arrange(step_number) %>%
                             select(set_goal, rep_goal, percent_of_max) %>%
                             collect()
+                        global$primary_program <- primary_program
+                        global$primary_lifts <- primary_lifts
                         
                         tabs <- list()
                         
@@ -234,41 +239,28 @@ workout_server <- function(id, con) {
                             sets = c(3, 3, 2),
                             reps = c(10, 12, 20)
                         )
-                        secondary_lifts_1 <-
-                            global$exercises %>% 
-                                filter(
-                                    !primary_lift, 
-                                    muscle_group_id == primary_muscle_groups[1]
-                                ) %>% 
-                                sample_n(3)
+                        rep_pattern <- bind_rows(secondary_lift_sets, secondary_lift_sets)
                         
-                        for (secondary_lift_i in 1:3) {
+                        
+                        secondary_lifts <-
+                          global$exercises %>% 
+                          filter(!primary_lift) %>% 
+                          group_by(muscle_group_id) %>% 
+                          slice_sample(n = 3) %>% 
+                          bind_cols(rep_pattern)
+                        
+                        global$secondary_lifts <- secondary_lifts
+                        
+                        for (secondary_lift_i in 1:nrow(secondary_lifts)) {
                           tabs[[secondary_lift_i + 2]] <- secondary_lift_tab(
                             id = id,
-                            sets = secondary_lift_sets[[secondary_lift_i, "sets"]],
-                            reps = secondary_lift_sets[[secondary_lift_i, "reps"]],
-                            exercise_name = secondary_lifts_1[[secondary_lift_i, "exercise_name"]]
-                          )
-                        }
-                        
-                        secondary_lifts_2 <-
-                          global$exercises %>% 
-                          filter(
-                            !primary_lift, 
-                            muscle_group_id == primary_muscle_groups[2]
-                          ) %>% 
-                          sample_n(3)
-                        for (secondary_lift_i in 1:3) {
-                          tabs[[secondary_lift_i + 5]] <- secondary_lift_tab(
-                            id = id,
-                            sets = secondary_lift_sets[[secondary_lift_i, "sets"]],
-                            reps = secondary_lift_sets[[secondary_lift_i, "reps"]],
-                            exercise_name = secondary_lifts_2[[secondary_lift_i, "exercise_name"]]
+                            sets = secondary_lifts[[secondary_lift_i, "sets"]],
+                            reps = secondary_lifts[[secondary_lift_i, "reps"]],
+                            exercise_name = secondary_lifts[[secondary_lift_i, "exercise_name"]]
                           )
                         }
                         
                         do.call(tabsetPanel, tabs)
-                        
                     })
                     
                     shinyjs::hide("choose_workout_ui")
@@ -291,6 +283,13 @@ workout_server <- function(id, con) {
             handlerExpr = {
                 beepr::beep(8)
                 # system("aplay -t wav ~/HDD1/gym_rat/www/fy.wav")
+              
+              
+                browser()
+                # global$secondary_lifts
+                # global$primary_lifts
+                # sum(global$primary_program$set_goal)
+                # input[["Bench Press1"]]
                 
                 shinyjs::hide("workout_ui")
                 shinyjs::show("workout_summary_ui")
