@@ -28,8 +28,8 @@ workout_ui <- function() {
     
     workout_ui <- fluidPage(
         fluidRow(
-            column(width = 4, muscle_groups_vb),
-            column(width = 2, timer_vb)
+            column(width = 2, timer_vb),
+            column(width = 10, muscle_groups_vb)
         ),
         fluidRow(column(width = 12, uiOutput("workout_tabs"))),
         fluidRow(column(width = 12, end_wo_bttn))

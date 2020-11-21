@@ -51,3 +51,7 @@ lift_insert_template <- readr::read_file(
 set_insert_template <- readr::read_file(
     here("www", "tabs", "workout", "set_insert.sql")
 )
+
+update_end_dttm_template <- readr::read_file(
+    here("www", "tabs", "workout", "update_end_dttm.sql")
+)

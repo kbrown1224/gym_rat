@@ -1,0 +1,1 @@
+update workout set end_dttm = current_timestamp where id = {workout_id};

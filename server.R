@@ -27,6 +27,8 @@ function(input, output, session) {
     
     last_wo_df <- reactive({
         tbl(db_con, "last_workout") %>% 
+            filter(id != 4) %>% 
+            arrange(desc(days_ago)) %>% 
             collect() %>% 
             rename_all(~str_to_title(str_replace_all(., "_", " ")))
     })
@@ -109,13 +111,13 @@ function(input, output, session) {
             selected_row <- input$last_wo_table_rows_selected
             if (!is.null(selected_row)) {
                 # beepr::beep(8)
-                global$wo_start_dttm <- Sys.time()
+                global$wo_start_dttm <- now()
                 
                 this_workout_group_id <- last_wo_df()[[selected_row, "Id"]]
                 
                 insert_statement <- glue_sql(
                     insert_wo_template,
-                    start_dttm = now(),
+                    start_dttm = global$wo_start_dttm,
                     workout_group_id = this_workout_group_id,
                     program_id = 1,
                     .con = db_con
@@ -193,11 +195,6 @@ function(input, output, session) {
                         arrange(step_number) %>%
                         select(rep_goal, percent_of_max) %>%
                         collect()
-                    
-                    secondary_lift_sets <- tibble(
-                        sets = c(3, 3, 2),
-                        reps = c(10, 12, 20)
-                    )
                     
                     rep_pattern <- list(
                         tibble(rep_goal = c(10, 10, 10)),
@@ -356,6 +353,17 @@ function(input, output, session) {
         
             global$wo_end_dttm <- Sys.time()
             
+            update_statement <- glue_sql(
+                update_end_dttm_template, 
+                workout_id = global$workout_id, 
+                .con = db_con
+            )
+            update_result <-  DBI::dbSendStatement(
+                db_con, 
+                update_statement
+            )
+            DBI::dbClearResult(res = update_result)
+            
             output$workout_duration <- renderValueBox({
                 workout_duration = round(global$wo_end_dttm - global$wo_start_dttm)
                 
@@ -415,9 +423,15 @@ function(input, output, session) {
                     ) %>% 
                     arrange(muscle_group_id, desc(primary_lift)) %>% 
                     ungroup() %>% 
-                    select(exercise_name, hit_rep_goal, hit_weight_goal, total_weight_moved) %>% 
+                    select(
+                        exercise_name, 
+                        hit_rep_goal, 
+                        hit_weight_goal, 
+                        total_weight_moved
+                    ) %>% 
                     rename_all(~str_to_title(str_replace_all(., "_", " "))) %>% 
                     datatable(
+                        escape = FALSE,
                         style = "bootstrap",
                         autoHideNavigation = TRUE,
                         class = "cell-border stripe",
@@ -427,16 +441,17 @@ function(input, output, session) {
                             paging = FALSE,
                             searching = FALSE,
                             bSort = FALSE,
-                            dom = 't'
-                            # headerCallback = DT::JS(
-                            #     "function(thead) {",
-                            #     "  $(thead).css('font-size', '40pt');",
-                            #     "  $(thead).css('color', '#fff');",
-                            #     "}"
-                            # )
+                            dom = 't',
+                            fnDrawCallback = DT::JS(
+                                'function(){
+                                  HTMLWidgets.staticRender();
+                                }'
+                            )
                         )
-                    )
+                    ) 
             })
+            
+            saveRDS(lifts, "lifts.RDS")
             
             shinyjs::hide("workout_ui")
             shinyjs::show("workout_summary_ui")
