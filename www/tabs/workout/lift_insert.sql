@@ -1,0 +1,1 @@
+insert into lift (workout_id, exercise_id) values {insert} returning id;

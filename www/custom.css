@@ -1,3 +1,8 @@
+.small-box.bg-red {
+    background-color: #E31C25 !important;
+    color: #fff !important;
+}
+
 .bttn-pill.bttn-primary {
     color: #fff !important;
     background: #BB000E !important;

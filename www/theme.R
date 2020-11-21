@@ -78,7 +78,8 @@ dashboard_theme <- shinyDashboardThemeDIY(
     ,sidebarTabRadiusHover = "5px"
     
     ### boxes
-    ,boxBackColor = "rgb(52,62,72)"
+    # ,boxBackColor = "rgb(52,62,72)"
+    ,boxBackColor = "rgb(22, 22, 22)"
     ,boxBorderRadius = 5
     ,boxShadowSize = "0px 0px 0px"
     ,boxShadowColor = ""
