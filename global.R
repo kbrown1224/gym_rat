@@ -19,6 +19,7 @@ library(waiter)
 
 source(here("www", "misc_pages.R"))
 source(here("www", "theme.R"))
+source(here("www", "db.R"))
 # source(here("www", "workout_ui.R"))
 for (tab_dir in list.files(here("www", "tabs"))){
     for (r_file in list.files(here("www", "tabs", tab_dir), pattern = "*.R")) {
@@ -34,24 +35,4 @@ db_con = DBI::dbConnect(
     user = "svc_gym_rat",
     password = "get_big",
     options = "-c search_path=kip"
-)
-
-insert_wo_template <- readr::read_file(
-    here("www", "tabs", "workout", "insert_workout.sql")
-)
-
-update_workout_number <- readr::read_file(
-    here("www", "tabs", "workout", "update_workout_number.sql")
-)
-
-lift_insert_template <- readr::read_file(
-    here("www", "tabs", "workout", "lift_insert.sql")
-)
-
-set_insert_template <- readr::read_file(
-    here("www", "tabs", "workout", "set_insert.sql")
-)
-
-update_end_dttm_template <- readr::read_file(
-    here("www", "tabs", "workout", "update_end_dttm.sql")
 )

@@ -24,15 +24,12 @@ function(input, output, session) {
     # This shows the sever page if the application disconnects from the server
     sever(html = sever_page())
     
+    #### Select Workout UI =====================================================
+    # Get a data frame of the last workout of each muscle group. Used for the 
+    # selecting a workout
+    last_wo_df <- reactive({get_last_workouts(db_con)})
     
-    last_wo_df <- reactive({
-        tbl(db_con, "last_workout") %>% 
-            filter(id != 4) %>% 
-            arrange(desc(days_ago)) %>% 
-            collect() %>% 
-            rename_all(~str_to_title(str_replace_all(., "_", " ")))
-    })
-    
+    # Render the data table of last workouts
     output$last_wo_table <- renderDT({
         last_wo_df() %>% 
             mutate(
@@ -74,6 +71,152 @@ function(input, output, session) {
             )
     })
     
+    # Observe button to begin workout
+    observeEvent(
+        eventExpr = input$begin_workout,
+        handlerExpr = {
+            selected_row <- input$last_wo_table_rows_selected
+            if (!is.null(selected_row)) {
+                # beepr::beep(8)
+                # Mark the beginning of the workout
+                global$wo_start_dttm <- now()
+                
+                # Extract the workout group id from what was selected
+                this_workout_group_id <- last_wo_df()[[selected_row, "Id"]]
+                
+                # Create the workout record in the database and record the id
+                global$workout_id <- write_workout(
+                    con = db_con,
+                    start_dttm = global$wo_start_dttm,
+                    workout_group_id = this_workout_group_id
+                )
+                
+                # We need to know the primary workout number we should be on
+                this_workout_number <- get_workout_number(
+                    con = db_con,
+                    workout_id = global$workout_id,
+                    workout_group_id = this_workout_group_id
+                )
+                
+                # We need to update the workout record with the workout we are on
+                update_workout(
+                    con = db_con,
+                    workout_id = global$workout_id,
+                    workout_number = this_workout_number
+                )
+                
+                # We need the muscle groups to generate the workout
+                muscle_groups <- get_muscle_groups(
+                    con = db_con, 
+                    workout_group_id = this_workout_group_id
+                )
+                
+                # We need to separate the primary and secondary muscle groups, 
+                # Because their structure is very different
+                primary_muscle_groups <- 
+                    muscle_groups %>% 
+                    filter(!(muscle_group_id %in% c(7, 8))) %>% 
+                    magrittr::extract2(1)
+                
+                # Get the exercises for the muscle groups in our workout
+                global$exercises <- get_exercises(
+                    con = db_con, 
+                    primary_muscle_groups = primary_muscle_groups
+                )
+                
+                # Now lets render the workout UI
+                output$workout_tabs <- renderUI({
+                    
+                    # First, we pull out the primary lifts
+                    primary_lifts <- 
+                        global$exercises %>% 
+                        filter(primary_lift)
+                    
+                    # Get the workout for the step in the program we are on
+                    primary_program <- get_primary_program(
+                        con = db_con,
+                        this_workout_number = this_workout_number
+                    )
+                    
+                    # We need the lift maxes for the primary lifts. We need this
+                    # to fill in the primary program
+                    lift_maxes <- get_maxes(
+                        con = db_con,
+                        exercise_ids = primary_lifts$exercise_id
+                    )
+                    
+                    # Tidy up the primary lifts data frame
+                    primary_lifts$sets <- list(primary_program, primary_program)
+                    primary_lifts <- 
+                        primary_lifts %>% 
+                        inner_join(lift_maxes, by = "exercise_id")
+                    
+                    # sets is a nested data frame inside of primary lifts
+                    for (i in 1:nrow(primary_lifts)) {
+                        primary_lifts[[i, "sets"]][[1]] <-
+                            primary_lifts[[i, "sets"]][[1]] %>% 
+                            mutate(
+                                weight = percent_of_max * primary_lifts[[i, "weight"]],
+                                weight = 5 * floor(weight / 5)
+                            ) %>% 
+                            select(-percent_of_max)
+                    }
+                       
+                    # Lets define the workout structure for the secondary lifts
+                    # TODO - Move this to the database
+                    rep_pattern <- list(
+                        tibble(rep_goal = c(10, 10, 10)),
+                        tibble(rep_goal = c(12, 12, 12)),
+                        tibble(rep_goal = c(20, 20)),
+                        tibble(rep_goal = c(10, 10, 10)),
+                        tibble(rep_goal = c(12, 12, 12)),
+                        tibble(rep_goal = c(20, 20))
+                    )
+                    
+                    # Extract the secondary lifts and sample 3 lifts from each
+                    # muscle group
+                    secondary_lifts <-
+                        global$exercises %>% 
+                        filter(!primary_lift) %>% 
+                        group_by(muscle_group_id) %>% 
+                        slice_sample(n = 3) 
+                    
+                    secondary_lifts$sets <- rep_pattern
+                    
+                    # TODO - Get the proper weight for each exercise
+                    secondary_lifts$weight <- 30
+                    
+                    # Same concept here as the primary lifts
+                    for (i in 1:nrow(secondary_lifts)) {
+                        secondary_lifts[[i, "sets"]][[1]] <-
+                            secondary_lifts[[i, "sets"]][[1]] %>% 
+                            mutate(weight = secondary_lifts[[i, "weight"]]) 
+                    }
+                    
+                    # Lets put the primary and secondary lifts into a single 
+                    # data frame. Then we can build the lifts ui
+                    global$lifts <- bind_rows(primary_lifts, secondary_lifts)
+                    lifts_ui(global$lifts)
+                })
+                
+                # Swap the UIs and play a fun little message
+                shinyjs::hide("choose_workout_ui")
+                shinyjs::show("workout_ui")
+                system(glue('aplay -t wav {here("www", "gl.wav")}'))
+                
+            } else {
+                sendSweetAlert(
+                    session = session,
+                    title = "You Must Select a Workout",
+                    type = "error"
+                )   
+            }
+        }
+    )
+    
+    #### Workout UI ============================================================
+    # Timer at the top of of the workout UI. Starts at the beginning of the 
+    # workout
     output$workout_timer <- renderValueBox({
         invalidateLater(millis = 1000)
         workout_dur <- as.period(as.duration(Sys.time() - global$wo_start_dttm))
@@ -93,6 +236,7 @@ function(input, output, session) {
         
     })
     
+    # Muscle group value box at the top of the workout UI
     output$muscle_groups <- renderValueBox({
         selected_row <- input$last_wo_table_rows_selected
         workout_name <- last_wo_df()[selected_row, "Workout Name"]
@@ -105,196 +249,23 @@ function(input, output, session) {
         )
     })
     
-    observeEvent(
-        eventExpr = input$begin_workout,
-        handlerExpr = {
-            selected_row <- input$last_wo_table_rows_selected
-            if (!is.null(selected_row)) {
-                # beepr::beep(8)
-                global$wo_start_dttm <- now()
-                
-                this_workout_group_id <- last_wo_df()[[selected_row, "Id"]]
-                
-                insert_statement <- glue_sql(
-                    insert_wo_template,
-                    start_dttm = global$wo_start_dttm,
-                    workout_group_id = this_workout_group_id,
-                    program_id = 1,
-                    .con = db_con
-                )
-                insert_result <-  DBI::dbSendStatement(
-                    db_con, 
-                    insert_statement
-                )
-                global$workout_id <- DBI::dbFetch(res = insert_result)[[1]]
-                DBI::dbClearResult(res = insert_result)
-                
-                wo_number <-
-                    tbl(db_con, "workout") %>% 
-                    filter(
-                        workout_group_id == !!this_workout_group_id, 
-                        id != !!global$workout_id
-                    ) %>% 
-                    arrange(desc(start_dttm)) %>%
-                    head(1) %>% 
-                    select(workout_number) %>%
-                    collect() %>%
-                    magrittr::extract2(1)
-                
-                if (isTruthy(wo_number < 16)) {
-                    this_workout_number <- wo_number + 1
-                } else {
-                    this_workout_number <- 1
-                }
-                
-                update_workout_statement <- glue_sql(
-                    update_workout_number,
-                    workout_number = this_workout_number,
-                    workout_id = global$workout_id,
-                    .con = db_con
-                )
-                update_result <- DBI::dbSendStatement(
-                    db_con, update_workout_statement
-                )
-                DBI::dbClearResult(update_result)
-                
-                muscle_groups <-
-                    tbl(db_con, "workout_group") %>% 
-                    filter(id == !!this_workout_group_id) %>% 
-                    select(muscle_group_id) %>% 
-                    collect()
-                
-                primary_muscle_groups <- 
-                    muscle_groups %>% 
-                    filter(!(muscle_group_id %in% c(7, 8))) %>% 
-                    magrittr::extract2(1)
-                
-                global$exercises <- 
-                    tbl(db_con, "exercise") %>% 
-                    filter(muscle_group_id %in% !! primary_muscle_groups) %>% 
-                    select(
-                        exercise_id = id,
-                        exercise_name = name,
-                        muscle_group_id,
-                        primary_lift
-                    ) %>% 
-                    collect()
-                
-                output$workout_tabs <- renderUI({
-                    
-                    primary_lifts <- 
-                        global$exercises %>% 
-                        filter(primary_lift)
-                    
-                    primary_program <-
-                        tbl(db_con, "program_steps") %>%
-                        filter(
-                            program_id == 1, 
-                            workout_number == this_workout_number
-                        ) %>%
-                        arrange(step_number) %>%
-                        select(rep_goal, percent_of_max) %>%
-                        collect()
-                    
-                    rep_pattern <- list(
-                        tibble(rep_goal = c(10, 10, 10)),
-                        tibble(rep_goal = c(12, 12, 12)),
-                        tibble(rep_goal = c(20, 20)),
-                        tibble(rep_goal = c(10, 10, 10)),
-                        tibble(rep_goal = c(12, 12, 12)),
-                        tibble(rep_goal = c(20, 20))
-                    )
-                    
-                    secondary_lifts <-
-                        global$exercises %>% 
-                        filter(!primary_lift) %>% 
-                        group_by(muscle_group_id) %>% 
-                        slice_sample(n = 3) 
-                    
-                    secondary_lifts$sets <- rep_pattern
-                    secondary_lifts$weight <- 30
-
-                    lift_maxes <-
-                        tbl(db_con, "personal_records") %>%
-                        filter(
-                            exercise_id %in% !!primary_lifts$exercise_id
-                        ) %>%
-                        select(exercise_id, weight) %>%
-                        collect()
-                    
-                    primary_lifts$sets <- list(primary_program, primary_program)
-                    primary_lifts <- 
-                        primary_lifts %>% 
-                        inner_join(lift_maxes, by = "exercise_id")
-                    
-                    for (i in 1:nrow(primary_lifts)) {
-                        primary_lifts[[i, "sets"]][[1]] <-
-                            primary_lifts[[i, "sets"]][[1]] %>% 
-                            mutate(
-                                weight = percent_of_max * primary_lifts[[i, "weight"]],
-                                weight = 5 * floor(weight / 5)
-                            ) %>% 
-                            select(-percent_of_max)
-                    }
-
-                    for (i in 1:nrow(secondary_lifts)) {
-                        secondary_lifts[[i, "sets"]][[1]] <-
-                            secondary_lifts[[i, "sets"]][[1]] %>% 
-                            mutate(weight = secondary_lifts[[i, "weight"]]) 
-                    }
-                    
-                    global$lifts <- bind_rows(primary_lifts, secondary_lifts)
-                    lifts_ui(global$lifts)
-                })
-                
-                shinyjs::hide("choose_workout_ui")
-                shinyjs::show("workout_ui")
-                # system("aplay -t wav ~/HDD1/gym_rat/www/gl.wav")
-                
-            } else {
-                sendSweetAlert(
-                    session = session,
-                    title = "You Must Select a Workout",
-                    type = "error"
-                )   
-            }
-            
-        }
-    )
-    
+    # Observe button click on end workout
     observeEvent(
         eventExpr = input$end_workout,
         handlerExpr = {
-            # beepr::beep(8)
-            # system("aplay -t wav ~/HDD1/gym_rat/www/fy.wav")
+            beepr::beep(8)
+
+            # This wasn't working if I simply used global$lifts.
             lifts <- global$lifts
             
-            insert <- 
-                lifts %>% 
-                mutate(
-                    inserts = glue_sql(
-                        "({workout_id}, {exercise_id})",
-                        workout_id = global$workout_id,
-                        exercise_id = exercise_id
-                    )
-                ) %>% 
-                summarize(insert = paste0(inserts, collapse = ", ")) %>% 
-                magrittr::extract2(1)
-            
-            insert_statement <- glue_sql(
-                lift_insert_template, 
-                insert = SQL(insert), 
-                .con = db_con
+            # Insert the lifts into the db then store the resulting ids
+            lifts$lift_id = insert_lifts(
+                con = db_con,
+                workout_id = global$workout_id,
+                lifts_df = lifts
             )
             
-            insert_result <-  DBI::dbSendStatement(
-                db_con, 
-                insert_statement
-            )
-            lift_ids <- DBI::dbFetch(res = insert_result)[[1]]
-            DBI::dbClearResult(res = insert_result)
-            lifts$lift_id = lift_ids
-            
+            # Grab all of the inputs from the UI
             for (lift_i in 1:nrow(lifts)) {
                 exercise_name <- lifts[[lift_i, "exercise_name"]]
                 sets <- lifts[[lift_i, "sets"]][[1]]
@@ -323,47 +294,17 @@ function(input, output, session) {
                 lifts[[lift_i, "sets"]][[1]] <- sets
             }
             
-            inserts <- 
-                lifts %>% 
-                select(lift_id, sets) %>% 
-                unnest(cols = c(sets)) %>% 
-                filter(rep_actual > 0) %>% 
-                mutate(
-                    inserts = glue_sql(
-                        "({lift_id}, {set_number}, {repititions}, {weight})",
-                        lift_id = lift_id,
-                        set_number = set_number,
-                        repititions = rep_actual,
-                        weight = weight_actual
-                    )
-                ) %>% 
-                summarize(insert = paste0(inserts, collapse = ", ")) %>% 
-                magrittr::extract2(1)
+            # Insert the exercises into the database
+            insert_exercises(
+                con = db_con,
+                lifts_df = lifts
+            )
             
-            insert_statement <- glue_sql(
-                set_insert_template, 
-                insert = SQL(inserts), 
-                .con = db_con
-            )
-            insert_result <-  DBI::dbSendStatement(
-                db_con, 
-                insert_statement
-            )
-            DBI::dbClearResult(res = insert_result)
-        
-            global$wo_end_dttm <- Sys.time()
+            # Mark the end of the workout
+            global$wo_end_dttm <- now()
+            update_workout_end(con = db_con, workout_id = global$workout_id)
             
-            update_statement <- glue_sql(
-                update_end_dttm_template, 
-                workout_id = global$workout_id, 
-                .con = db_con
-            )
-            update_result <-  DBI::dbSendStatement(
-                db_con, 
-                update_statement
-            )
-            DBI::dbClearResult(res = update_result)
-            
+            # Now lets render the end workout outputs
             output$workout_duration <- renderValueBox({
                 workout_duration = round(global$wo_end_dttm - global$wo_start_dttm)
                 
@@ -450,16 +391,13 @@ function(input, output, session) {
                         )
                     ) 
             })
-            
-            saveRDS(lifts, "lifts.RDS")
-            
             shinyjs::hide("workout_ui")
             shinyjs::show("workout_summary_ui")
         }
     )
     
     
-    
+    #### Workout Summary UI ====================================================
     observeEvent(
         eventExpr = input$return_home,
         handlerExpr = {
