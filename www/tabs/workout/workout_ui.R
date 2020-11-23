@@ -95,24 +95,41 @@ lifts_ui <- function(lifts) {
             
             set_components[[set_i]] <- fluidRow(
                 column(
-                    width = 4,
+                    width = 5,
                     tags$h1(
-                        glue('Goal: {reps} at {weight}')
+                        glue('Goal: {reps} reps at {weight} lbs')
                     )
                 ),
                 column(
-                    width = 4,
-                    numericInput(
+                    width = 2,
+                    knobInput(
                         inputId = paste0(input_id_base, "_weight_", set_i),
                         label = "Weight",
                         value = weight,
                         min = 5,
-                        max = 200,
-                        step = 5
-                    )
+                        max = weight + 50,
+                        step = 5,
+                        displayInput = TRUE,
+                        inputColor = get_color("primary", "hex"),
+                        width = "100px",
+                        height = "100px",
+                        thickness = 0.25,
+                        lineCap = "round",
+                        fgColor = get_color("success", "hex"),
+                        bgColor = "#161616",
+                        fontSize = "30px"
+                    ),
+                    # numericInput(
+                    #     inputId = paste0(input_id_base, "_weight_", set_i),
+                    #     label = "Weight",
+                    #     value = weight,
+                    #     min = 5,
+                    #     max = 200,
+                    #     step = 5
+                    # )
                 ),
                 column(
-                    width = 4,
+                    width = 5,
                     sliderInput(
                         inputId = paste0(input_id_base, "_", set_i),
                         label = "Reps Achieved",
@@ -120,7 +137,8 @@ lifts_ui <- function(lifts) {
                         max = reps,
                         value = 0,
                         step = 1,
-                        animate = FALSE
+                        animate = FALSE,
+                        ticks = FALSE
                     )
                 )
             )

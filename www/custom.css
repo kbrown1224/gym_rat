@@ -1,3 +1,21 @@
+.nav-tabs li a:hover, .nav-tabs > .active > a {
+    color: #fff !important;
+    
+    background-color: #E31C25 !important;
+    background-image: none !important;
+}
+
+.tabbable > .nav > li > a {
+    color: #fff !important;
+    background-color: #161616 !important;
+}
+
+.tabbable > .nav > li[class=active] > a {
+    color: #161616 !important;
+    background-color: #E31C25 !important;
+    font-weight: bold;
+}
+
 .small-box.bg-red {
     background-color: #E31C25 !important;
     color: #fff !important;
