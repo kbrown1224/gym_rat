@@ -183,6 +183,17 @@ function(input, output, session) {
                             ) %>% 
                             select(-percent_of_max)
                     }
+                    
+                    primary_lifts <-
+                        primary_lifts %>% 
+                        select(-weight) %>% 
+                        unnest(sets) %>% 
+                        group_by(exercise_id) %>% 
+                        summarize(
+                            min_weight = min(weight),
+                            max_weight = max(weight)
+                        ) %>% 
+                        right_join(primary_lifts, by = "exercise_id")
                        
                     # Lets define the workout structure for the secondary lifts
                     # TODO - Move this to the database
@@ -206,7 +217,43 @@ function(input, output, session) {
                     secondary_lifts$sets <- rep_pattern
                     
                     # TODO - Get the proper weight for each exercise
-                    secondary_lifts$weight <- 30
+                    # secondary_lifts$weight <- 30
+                    
+                    secondary_lifts <- 
+                        secondary_lifts %>% 
+                        unnest(sets) %>% 
+                        group_by(exercise_id) %>% 
+                        summarize(rep_goal = max(rep_goal)) %>% 
+                        left_join(
+                            y = get_past_exercise_summaries(
+                                db_con, 
+                                secondary_lifts$exercise_id
+                            ),
+                            by = "exercise_id"
+                        ) %>% 
+                        mutate(
+                            rep_distance = abs(rep_goal - repetitions),
+                            rep_factor = (repetitions - rep_goal) / repetitions,
+                            rep_factor = rep_factor + 1,
+                            max_weight = case_when(
+                                rep_factor < 1 ~ max_weight * 1.05,
+                                rep_factor > 1 ~ max_weight * rep_factor,
+                                TRUE ~ max_weight * 1.1
+                            ),
+                            max_weight = 5 * ceiling(max_weight / 5),
+                            min_weight = 5 * ceiling((0.75 * min_weight) / 5),
+                            weight = max_weight
+                        ) %>% 
+                        group_by(exercise_id) %>% 
+                        filter(rep_distance == min(rep_distance)) %>% 
+                        select(exercise_id, max_weight, min_weight, weight) %>% 
+                        right_join(secondary_lifts, by = "exercise_id") %>% 
+                        mutate(
+                            max_weight = replace_na(max_weight, 200),
+                            min_weight = replace_na(min_weight, 5),
+                            weight = replace_na(weight, 75)
+                        )
+                    
                     
                     # Same concept here as the primary lifts
                     for (i in 1:nrow(secondary_lifts)) {
@@ -214,6 +261,8 @@ function(input, output, session) {
                             secondary_lifts[[i, "sets"]][[1]] %>% 
                             mutate(weight = secondary_lifts[[i, "weight"]]) 
                     }
+                    
+                    
                     
                     # Lets put the primary and secondary lifts into a single 
                     # data frame. Then we can build the lifts ui

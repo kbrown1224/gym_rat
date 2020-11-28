@@ -18,6 +18,10 @@ update_end_dttm_template <- readr::read_file(
     here("www", "tabs", "workout", "update_end_dttm.sql")
 )
 
+past_exercise_template <- readr::read_file(
+    here("www", "tabs", "workout", "past_exercise_summary.sql")
+)
+
 get_last_workouts <- function (con) {
     return(
         tbl(con, "last_workout") %>% 
@@ -209,4 +213,15 @@ delete_workout <- function(con, workout_id) {
     
     delete_result <- DBI::dbSendStatement(con, delete_statement)
     DBI::dbClearResult(delete_result)
+}
+
+
+get_past_exercise_summaries <- function(con, exercise_ids) {
+    statement <- glue_sql(
+        past_exercise_template,
+        exercise_ids = SQL(glue("({paste(exercise_ids, collapse = ', ')})")),
+        .con = con
+    )
+    
+    return(DBI::dbGetQuery(con, statement))
 }
