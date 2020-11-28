@@ -24,6 +24,28 @@ function(input, output, session) {
     # This shows the sever page if the application disconnects from the server
     sever(html = sever_page())
     
+    # Turn off the system
+    observeEvent(
+        eventExpr = input$poweroff,
+        handlerExpr = {
+            confirmSweetAlert(
+                session = session,
+                inputId = "confirm_poweroff",
+                title = "Are you sure you want to power off?",
+                text = "Unfinished workouts will be lost."
+            )
+        }
+    )
+    
+    observeEvent(
+        eventExpr = input$confirm_poweroff,
+        handlerExpr = {
+            if (input$confirm_poweroff) {
+                system("poweroff")
+            }
+        }
+    )
+    
     #### Select Workout UI =====================================================
     # Get a data frame of the last workout of each muscle group. Used for the 
     # selecting a workout
@@ -214,6 +236,18 @@ function(input, output, session) {
         }
     )
     
+    observeEvent(
+        eventExpr = input$cancel_workout,
+        ignoreInit = TRUE,
+        handlerExpr = {
+            delete_workout(db_con, global$workout_id)
+            
+            shinyjs::hide("workout_ui")
+            shinyjs::show("choose_workout_ui")
+            
+        }
+    )
+    
     #### Workout UI ============================================================
     # Timer at the top of of the workout UI. Starts at the beginning of the 
     # workout
@@ -253,146 +287,160 @@ function(input, output, session) {
     observeEvent(
         eventExpr = input$end_workout,
         handlerExpr = {
-            beepr::beep(8)
-
-            # This wasn't working if I simply used global$lifts.
-            lifts <- global$lifts
-            
-            # Insert the lifts into the db then store the resulting ids
-            lifts$lift_id = insert_lifts(
-                con = db_con,
-                workout_id = global$workout_id,
-                lifts_df = lifts
+            confirmSweetAlert(
+                session = session,
+                inputId = "confirm_end",
+                title = "WAIT",
+                text = "Are you sure you're are done pumping iron?"
             )
-            
-            # Grab all of the inputs from the UI
-            for (lift_i in 1:nrow(lifts)) {
-                exercise_name <- lifts[[lift_i, "exercise_name"]]
-                sets <- lifts[[lift_i, "sets"]][[1]]
+        }
+    )
+    
+    observeEvent(
+        eventExpr = input$confirm_end,
+        handlerExpr = {
+            if (input$confirm_end) {
+                beepr::beep(8)
                 
-                input_base <- paste0(
-                    str_to_lower(str_replace_all(exercise_name, " ", "_")), 
-                    "_"
+                # This wasn't working if I simply used global$lifts.
+                lifts <- global$lifts
+                
+                # Insert the lifts into the db then store the resulting ids
+                lifts$lift_id = insert_lifts(
+                    con = db_con,
+                    workout_id = global$workout_id,
+                    lifts_df = lifts
                 )
                 
-                reps_input_ids <- paste0(input_base, 1:nrow(sets))
-                weight_input_ids <- paste0(input_base, "weight_", 1:nrow(sets))
-                
-                reps <- c()
-                for (input_id in reps_input_ids) {
-                    reps <- c(reps, input[[input_id]])
+                # Grab all of the inputs from the UI
+                for (lift_i in 1:nrow(lifts)) {
+                    exercise_name <- lifts[[lift_i, "exercise_name"]]
+                    sets <- lifts[[lift_i, "sets"]][[1]]
+                    
+                    input_base <- paste0(
+                        str_to_lower(str_replace_all(exercise_name, " ", "_")), 
+                        "_"
+                    )
+                    
+                    reps_input_ids <- paste0(input_base, 1:nrow(sets))
+                    weight_input_ids <- paste0(input_base, "weight_", 1:nrow(sets))
+                    
+                    reps <- c()
+                    for (input_id in reps_input_ids) {
+                        reps <- c(reps, input[[input_id]])
+                    }
+                    
+                    weight <- c()
+                    for (input_id in weight_input_ids) {
+                        weight <- c(weight, input[[input_id]])
+                    }
+                    
+                    sets$rep_actual <- reps
+                    sets$weight_actual <- weight
+                    sets$set_number <- 1:nrow(sets)
+                    lifts[[lift_i, "sets"]][[1]] <- sets
                 }
                 
-                weight <- c()
-                for (input_id in weight_input_ids) {
-                    weight <- c(weight, input[[input_id]])
-                }
-                
-                sets$rep_actual <- reps
-                sets$weight_actual <- weight
-                sets$set_number <- 1:nrow(sets)
-                lifts[[lift_i, "sets"]][[1]] <- sets
-            }
-            
-            # Insert the exercises into the database
-            insert_exercises(
-                con = db_con,
-                lifts_df = lifts
-            )
-            
-            # Mark the end of the workout
-            global$wo_end_dttm <- now()
-            update_workout_end(con = db_con, workout_id = global$workout_id)
-            
-            # Now lets render the end workout outputs
-            output$workout_duration <- renderValueBox({
-                workout_duration = round(global$wo_end_dttm - global$wo_start_dttm)
-                
-                workout_dur <- as.period(as.duration(workout_duration))
-                h <- hour(workout_dur)
-                m <- minute(workout_dur)
-                s <- round(second(workout_dur))
-                
-                if (h == 0) {
-                    duration_string <- glue("{m} and {s} seconds")
-                }
-                formatted_dur <- ifelse(
-                    h == 0, 
-                    glue("{m} minutes and {s} seconds"), 
-                    glue("{h} hour, {m} minutes, and {s} seconds")
+                # Insert the exercises into the database
+                insert_exercises(
+                    con = db_con,
+                    lifts_df = lifts
                 )
                 
-                valueBox(
-                    value = formatted_dur,
-                    subtitle = "Workout Duration",
-                    icon = icon("clock"),
-                    color = "black",
-                    width = 12
-                )
-            })
-            
-            output$total_weight <- renderValueBox({
-                total_weight <- 
+                # Mark the end of the workout
+                global$wo_end_dttm <- now()
+                update_workout_end(con = db_con, workout_id = global$workout_id)
+                
+                # Now lets render the end workout outputs
+                output$workout_duration <- renderValueBox({
+                    workout_duration = round(global$wo_end_dttm - global$wo_start_dttm)
+                    
+                    workout_dur <- as.period(as.duration(workout_duration))
+                    h <- hour(workout_dur)
+                    m <- minute(workout_dur)
+                    s <- round(second(workout_dur))
+                    
+                    if (h == 0) {
+                        duration_string <- glue("{m} and {s} seconds")
+                    }
+                    formatted_dur <- ifelse(
+                        h == 0, 
+                        glue("{m} minutes and {s} seconds"), 
+                        glue("{h} hour, {m} minutes, and {s} seconds")
+                    )
+                    
+                    valueBox(
+                        value = formatted_dur,
+                        subtitle = "Workout Duration",
+                        icon = icon("clock"),
+                        color = "black",
+                        width = 12
+                    )
+                })
+                
+                output$total_weight <- renderValueBox({
+                    total_weight <- 
+                        lifts %>% 
+                        select(sets) %>% 
+                        unnest(sets) %>% 
+                        filter(rep_actual > 0) %>% 
+                        summarize(total_weight = sum(weight_actual * rep_actual)) %>% 
+                        magrittr::extract2(1)
+                    valueBox(
+                        value = total_weight,
+                        subtitle = "Total Weight Moved",
+                        icon = icon("dumbell"),
+                        color = "black",
+                        width = 12
+                    )
+                })
+                
+                output$set_summary <- renderDT({
                     lifts %>% 
-                    select(sets) %>% 
-                    unnest(sets) %>% 
-                    filter(rep_actual > 0) %>% 
-                    summarize(total_weight = sum(weight_actual * rep_actual)) %>% 
-                    magrittr::extract2(1)
-                valueBox(
-                    value = total_weight,
-                    subtitle = "Total Weight Moved",
-                    icon = icon("dumbell"),
-                    color = "black",
-                    width = 12
-                )
-            })
-            
-            output$set_summary <- renderDT({
-                lifts %>% 
-                    select(-weight) %>% 
-                    unnest(sets) %>% 
-                    mutate(
-                        hit_weight_goal = weight_actual >= weight, 
-                        hit_rep_goal = rep_actual >= rep_goal
-                    ) %>% 
-                    group_by(exercise_name, primary_lift, muscle_group_id) %>% 
-                    summarize(
-                        hit_rep_goal = paste0(round(100 * sum(hit_rep_goal) / n()), "%"),
-                        hit_weight_goal = paste0(round(100 * sum(hit_weight_goal) / n()), "%"),
-                        total_weight_moved = sum(weight_actual * rep_actual)
-                    ) %>% 
-                    arrange(muscle_group_id, desc(primary_lift)) %>% 
-                    ungroup() %>% 
-                    select(
-                        exercise_name, 
-                        hit_rep_goal, 
-                        hit_weight_goal, 
-                        total_weight_moved
-                    ) %>% 
-                    rename_all(~str_to_title(str_replace_all(., "_", " "))) %>% 
-                    datatable(
-                        escape = FALSE,
-                        style = "bootstrap",
-                        autoHideNavigation = TRUE,
-                        class = "cell-border stripe",
-                        selection = "single",
-                        options = list(
-                            lengthChange = FALSE,
-                            paging = FALSE,
-                            searching = FALSE,
-                            bSort = FALSE,
-                            dom = 't',
-                            fnDrawCallback = DT::JS(
-                                'function(){
-                                  HTMLWidgets.staticRender();
-                                }'
+                        select(-weight) %>% 
+                        unnest(sets) %>% 
+                        mutate(
+                            hit_weight_goal = weight_actual >= weight, 
+                            hit_rep_goal = rep_actual >= rep_goal
+                        ) %>% 
+                        group_by(exercise_name, primary_lift, muscle_group_id) %>% 
+                        summarize(
+                            hit_rep_goal = paste0(round(100 * sum(hit_rep_goal) / n()), "%"),
+                            hit_weight_goal = paste0(round(100 * sum(hit_weight_goal) / n()), "%"),
+                            total_weight_moved = sum(weight_actual * rep_actual)
+                        ) %>% 
+                        arrange(muscle_group_id, desc(primary_lift)) %>% 
+                        ungroup() %>% 
+                        select(
+                            exercise_name, 
+                            hit_rep_goal, 
+                            hit_weight_goal, 
+                            total_weight_moved
+                        ) %>% 
+                        rename_all(~str_to_title(str_replace_all(., "_", " "))) %>% 
+                        datatable(
+                            escape = FALSE,
+                            style = "bootstrap",
+                            autoHideNavigation = TRUE,
+                            class = "cell-border stripe",
+                            selection = "single",
+                            options = list(
+                                lengthChange = FALSE,
+                                paging = FALSE,
+                                searching = FALSE,
+                                bSort = FALSE,
+                                dom = 't',
+                                fnDrawCallback = DT::JS(
+                                    'function(){
+                              HTMLWidgets.staticRender();
+                            }'
+                                )
                             )
-                        )
-                    ) 
-            })
-            shinyjs::hide("workout_ui")
-            shinyjs::show("workout_summary_ui")
+                        ) 
+                })
+                shinyjs::hide("workout_ui")
+                shinyjs::show("workout_summary_ui")
+            }
         }
     )
     

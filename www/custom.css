@@ -31,6 +31,11 @@
     background: #E31C25 !important;
 }
 
+.bttn-pill.bttn-warning {
+    color: #fff !important;
+    background: #BEBEBE !important;
+}
+
 table.dataTable tr.active td, table.dataTable td.selected {
     background-color: #E31C25 !important;
 }

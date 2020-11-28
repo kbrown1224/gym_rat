@@ -17,9 +17,7 @@ db_header <- dashboardHeaderPlus(
     left_menu = NULL,
     enable_rightsidebar = TRUE,
     rightSidebarIcon = "th",
-    fixed = FALSE,
-    
-    dropdownMenuOutput(outputId = 'header_todos')
+    fixed = FALSE
 )
 
 #### Define Left Sidebar =======================================================
@@ -32,7 +30,21 @@ workout_menu <- menuItem(
 
 # Put Menu in the Sidebar
 db_left_sidebar <- dashboardSidebar(
-    sidebarMenu(id = "sb_menu", workout_menu)
+    sidebarMenu(id = "sb_menu", workout_menu),
+    collapsed = TRUE
+)
+
+# Put power off button in the right sidebar
+db_right_sidebar <- rightSidebar(
+    actionBttn(
+        inputId = "poweroff",
+        label = "Power Off",
+        icon = icon("power-off"),
+        style = "pill",
+        color = "success",
+        size = "md",
+        block = TRUE
+    )
 )
 
 #### Define Body ===============================================================
@@ -71,5 +83,6 @@ dashboardPagePlus(
     
     header = db_header,
     sidebar = db_left_sidebar,
+    rightsidebar = db_right_sidebar,
     body = db_body
 )

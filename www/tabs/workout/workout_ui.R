@@ -23,6 +23,15 @@ workout_ui <- function() {
         size = 'lg'
     )
     
+    cancel_wo_bttn <- actionBttn(
+        inputId = "cancel_workout",
+        label = "Cancel Workout",
+        style = "pill",
+        color = "warning",
+        block = TRUE,
+        size = "lg"
+    )
+    
     timer_vb <- valueBoxOutput('workout_timer', width = 12)
     muscle_groups_vb <- valueBoxOutput('muscle_groups', width = 12)
     
@@ -32,7 +41,9 @@ workout_ui <- function() {
             column(width = 10, muscle_groups_vb)
         ),
         fluidRow(column(width = 12, uiOutput("workout_tabs"))),
-        fluidRow(column(width = 12, end_wo_bttn))
+        br(),
+        fluidRow(column(width = 12, end_wo_bttn)),
+        fluidRow(column(width = 12, cancel_wo_bttn))
     )
     
     workout_duration_vb <- valueBoxOutput('workout_duration', width = 12)

@@ -199,3 +199,14 @@ update_workout_end <- function(con, workout_id) {
     )
     DBI::dbClearResult(res = update_result)
 }
+
+delete_workout <- function(con, workout_id) {
+    delete_statement <- glue_sql(
+        "delete from workout where id = {id};",
+        id = workout_id,
+        .con = con
+    )
+    
+    delete_result <- DBI::dbSendStatement(con, delete_statement)
+    DBI::dbClearResult(delete_result)
+}
