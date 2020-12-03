@@ -82,15 +82,19 @@ function(input, output, session) {
                         "function(thead) {",
                         "  $(thead).css('font-size', '40pt');",
                         "  $(thead).css('color', '#fff');",
+                        "  $(thead).css('background-color', '#1c1c1c');",
+                        # "  $(td).css('background-color', '#1c1c1c');",
                         "}"
                     )
                 )
             ) %>% 
             formatStyle(
-                columns = c(1, 2, 3),
+                columns = c(0, 1, 2, 3),
                 fontWeight = "bold",
-                fontSize = '30pt'
+                fontSize = '30pt',
+                backgroundColor = "#1c1c1c"
             )
+            
     })
     
     # Observe button to begin workout
