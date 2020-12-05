@@ -1,7 +1,21 @@
-FROM r-base:3.6.3
+# parent image
+FROM resin/raspberrypi3-debian:latest
 
-RUN apt-get update -y
-RUN apt-get install -y libpq-dev
+ENTRYPOINT []
+
+# enable systemd
+ENV INITSYSTEM on
+
+# update sources
+RUN echo "deb http://mirrordirector.raspbian.org/raspbian/ buster main" > /etc/apt/sources.list
+
+
+# install R
+RUN apt-get update && apt-get install -y \ 
+  r-base \ 
+  r-base-core \
+  r-base-dev \
+  libpq-dev
 
 RUN mkdir /home/gym_rat
 COPY ./ /home/gym_rat
