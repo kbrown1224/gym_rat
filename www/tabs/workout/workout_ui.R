@@ -95,8 +95,8 @@ lifts_ui <- function(lifts) {
         
         sets <- lifts[[lift_i, "sets"]][[1]]
         exercise_name <- lifts[[lift_i, "exercise_name"]]
-        min_weight = lifts[[lift_i, "min_weight"]]
-        max_weight = lifts[[lift_i, "max_weight"]]
+        min_weight = lifts[[lift_i, "min_weight"]] - 10
+        max_weight = lifts[[lift_i, "max_weight"]] + 20
         input_id_base <- str_to_lower(str_replace_all(exercise_name, " ", "_"))
         set_components <- list()
         

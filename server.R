@@ -278,6 +278,7 @@ function(input, output, session) {
                 shinyjs::hide("choose_workout_ui")
                 shinyjs::show("workout_ui")
                 system(glue('aplay -t wav {here("www", "gl.wav")}'))
+                set_fan_status("On")
                 
             } else {
                 sendSweetAlert(
@@ -297,6 +298,7 @@ function(input, output, session) {
             
             shinyjs::hide("workout_ui")
             shinyjs::show("choose_workout_ui")
+            set_fan_status("Off")
             
         }
     )
@@ -493,6 +495,7 @@ function(input, output, session) {
                 })
                 shinyjs::hide("workout_ui")
                 shinyjs::show("workout_summary_ui")
+                set_fan_status("Off")
             }
         }
     )

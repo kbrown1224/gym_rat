@@ -20,6 +20,7 @@ library(waiter)
 source(here("www", "misc_pages.R"))
 source(here("www", "theme.R"))
 source(here("www", "db.R"))
+source(here("www", "smart_house.R"))
 # source(here("www", "workout_ui.R"))
 for (tab_dir in list.files(here("www", "tabs"))){
     for (r_file in list.files(here("www", "tabs", tab_dir), pattern = "*.R")) {
