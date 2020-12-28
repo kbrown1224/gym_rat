@@ -22,6 +22,10 @@ past_exercise_template <- readr::read_file(
     here("www", "tabs", "workout", "past_exercise_summary.sql")
 )
 
+lift_mosts_template <- readr::read_file(
+    here("www", "tabs", "workout", "lift_mosts.sql")
+)
+
 get_last_workouts <- function (con) {
     return(
         tbl(con, "last_workout") %>% 
@@ -220,6 +224,36 @@ get_past_exercise_summaries <- function(con, exercise_ids) {
     statement <- glue_sql(
         past_exercise_template,
         exercise_ids = SQL(glue("({paste(exercise_ids, collapse = ', ')})")),
+        .con = con
+    )
+    
+    return(DBI::dbGetQuery(con, statement))
+}
+
+get_lift_history <- function(con, exercise_id) {
+    recent_dates <-
+        tbl(db_con, "lift_history_lookup") %>%
+        filter(exercise_id == !!exercise_id) %>%
+        distinct(date) %>%
+        arrange(desc(date)) %>%
+        head(3) %>%
+        collect() %>%
+        magrittr::extract2(1)
+    
+    return (
+        tbl(db_con, "lift_history_lookup") %>%
+            filter(
+                exercise_id == !!exercise_id,
+                date %in% !!recent_dates
+            ) %>%
+            collect()
+    )
+}
+
+get_lift_mosts <- function(con, exercise_id) {
+    statement <- glue_sql(
+        lift_mosts_template,
+        exercise_id = exercise_id,
         .con = con
     )
     

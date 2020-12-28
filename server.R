@@ -1,15 +1,6 @@
 function(input, output, session) {
     
     #### Initialize Application Server =========================================
-    # The first thing I do here is source all of my helper files. I could do 
-    # this in global.R, but I really like using waiter. It makes the app jump to
-    # a loading page instantly. global.R is sourced before ui and server, so 
-    # the loading screen wouldn't show until it was essentially done if I put 
-    # this in global.R.
-    # for (file in list.files(here::here("www", "helpers"))) {
-    #     source(here::here("www", "helpers", file))
-    # }
-    
     # Initialize global variables
     global <- reactiveValues(
         workout_id = NULL,
@@ -103,7 +94,7 @@ function(input, output, session) {
         handlerExpr = {
             selected_row <- input$last_wo_table_rows_selected
             if (!is.null(selected_row)) {
-                future({beepr::beep(8)})
+                # future({beepr::beep(8)})
                 # Mark the beginning of the workout
                 global$wo_start_dttm <- now()
                 
@@ -351,14 +342,17 @@ function(input, output, session) {
         }
     )
     
+    # Observe end workout confirmation, store workout data, and prepare workout 
+    # summary
     observeEvent(
         eventExpr = input$confirm_end,
         handlerExpr = {
             if (input$confirm_end) {
-                
+                # Async beep so it doesn't block progress
                 future({beepr::beep(8)})
                 
-                # This wasn't working if I simply used global$lifts.
+                # This wasn't working if I simply used global$lifts, idk why, 
+                # still needs some research.
                 lifts <- global$lifts
                 
                 # Insert the lifts into the db then store the resulting ids
@@ -370,27 +364,32 @@ function(input, output, session) {
                 
                 # Grab all of the inputs from the UI
                 for (lift_i in 1:nrow(lifts)) {
+                    # The lifts ui has creates all of its widgets with the 
+                    # naming convention exercise_name_weight_setnumber
                     exercise_name <- lifts[[lift_i, "exercise_name"]]
                     sets <- lifts[[lift_i, "sets"]][[1]]
-                    
                     input_base <- paste0(
                         str_to_lower(str_replace_all(exercise_name, " ", "_")), 
                         "_"
                     )
                     
+                    # Create vectors of all ui inputs for the given workout
                     reps_input_ids <- paste0(input_base, 1:nrow(sets))
                     weight_input_ids <- paste0(input_base, "weight_", 1:nrow(sets))
                     
+                    # Get all of the rep information in the ui
                     reps <- c()
                     for (input_id in reps_input_ids) {
                         reps <- c(reps, input[[input_id]])
                     }
                     
+                    # Get all of the weight information in the ui
                     weight <- c()
                     for (input_id in weight_input_ids) {
                         weight <- c(weight, input[[input_id]])
                     }
                     
+                    # Put this data into lifts as a nested data frame
                     sets$rep_actual <- reps
                     sets$weight_actual <- weight
                     sets$set_number <- 1:nrow(sets)
@@ -409,8 +408,8 @@ function(input, output, session) {
                 
                 # Now lets render the end workout outputs
                 output$workout_duration <- renderValueBox({
+                    # Calculate and format the workout duration string
                     workout_duration = round(global$wo_end_dttm - global$wo_start_dttm)
-                    
                     workout_dur <- as.period(as.duration(workout_duration))
                     h <- hour(workout_dur)
                     m <- minute(workout_dur)
@@ -434,6 +433,7 @@ function(input, output, session) {
                     )
                 })
                 
+                # Calculate and format the total weight moved
                 output$total_weight <- renderValueBox({
                     total_weight <- 
                         lifts %>% 
@@ -442,6 +442,7 @@ function(input, output, session) {
                         filter(rep_actual > 0) %>% 
                         summarize(total_weight = sum(weight_actual * rep_actual)) %>% 
                         magrittr::extract2(1)
+                    
                     valueBox(
                         value = total_weight,
                         subtitle = "Total Weight Moved",
@@ -451,6 +452,7 @@ function(input, output, session) {
                     )
                 })
                 
+                # Create a summary table from the lifts data frame
                 output$set_summary <- renderDT({
                     lifts %>% 
                         select(-weight) %>% 
@@ -459,10 +461,16 @@ function(input, output, session) {
                             hit_weight_goal = weight_actual >= weight, 
                             hit_rep_goal = rep_actual >= rep_goal
                         ) %>% 
-                        group_by(exercise_name, primary_lift, muscle_group_id) %>% 
+                        group_by(
+                            exercise_name, primary_lift, muscle_group_id
+                        ) %>% 
                         summarize(
-                            hit_rep_goal = paste0(round(100 * sum(hit_rep_goal) / n()), "%"),
-                            hit_weight_goal = paste0(round(100 * sum(hit_weight_goal) / n()), "%"),
+                            hit_rep_goal = paste0(
+                                round(100 * sum(hit_rep_goal) / n()), "%"
+                            ),
+                            hit_weight_goal = paste0(
+                                round(100 * sum(hit_weight_goal) / n()), "%"
+                            ),
                             total_weight_moved = sum(weight_actual * rep_actual)
                         ) %>% 
                         arrange(muscle_group_id, desc(primary_lift)) %>% 
@@ -473,7 +481,9 @@ function(input, output, session) {
                             hit_weight_goal, 
                             total_weight_moved
                         ) %>% 
-                        rename_all(~str_to_title(str_replace_all(., "_", " "))) %>% 
+                        rename_all(
+                            ~str_to_title(str_replace_all(., "_", " "))
+                        ) %>% 
                         datatable(
                             escape = FALSE,
                             style = "bootstrap",
@@ -494,6 +504,8 @@ function(input, output, session) {
                             )
                         ) 
                 })
+                
+                # Now lets 
                 shinyjs::hide("workout_ui")
                 shinyjs::show("workout_summary_ui")
                 future({set_fan_status("Off")})
@@ -501,6 +513,87 @@ function(input, output, session) {
         }
     )
     
+    # This observes the lift info button. Each tab in the ui has this button.
+    # All buttons trigger the same input, then we can refer to the value of that
+    # input to see which one was clicked. 
+    observeEvent(
+        eventExpr = input$lift_info,
+        handlerExpr = {
+            # Get most reps and weight I've ever done for this weight
+            exercise_id <- as.integer(str_split(input$lift_info, "_")[[1]][2])
+            lift_mosts <- get_lift_mosts(db_con, exercise_id)
+            
+            # Once we have the required information, render the history plot. 
+            # This shows the set|rep|weight data for the last 3 times this lifotiof njmrtm ntnm       t
+            output$lift_history <- renderPlot(
+                bg = 'transparent',
+                expr = {
+                    get_lift_history(db_con, exercise_id) %>% 
+                        arrange(date) %>% 
+                        mutate(label = glue("{repetitions} x {weight}")) %>%
+                        ggplot(aes(x = set_number, y = weight)) +
+                        geom_line(
+                            color = get_color("primary", "hex"), 
+                            size = 2, 
+                            alpha = 0.5
+                        ) +
+                        geom_label_repel(
+                            aes(label = label),
+                            nudge_y = -1,
+                            color = get_color("success", "hex")
+                        ) +
+                        facet_wrap(date ~ ., ncol = 1) +
+                        labs(x = "Set", y = "Weight (lbs)") +
+                        plot_theme() +
+                        theme(
+                            strip.text = element_text(colour = 'white'),
+                            strip.background = element_rect(fill = "transparent")
+                        )
+                }
+            )
+            
+            # Filter the lift mosts data to most weight, render the value box
+            output$most_weight <- renderValueBox({
+                details <- lift_mosts %>% filter(category == 'most_weight')
+                subtitle <- strftime(details$workout_date, "%m/%d/%Y")
+                value <- glue(
+                    "{details$repetitions} reps at {details$weight} lbs"
+                )
+
+                valueBox(
+                    value = value,
+                    subtitle = subtitle,
+                    icon = icon("hashtag"),
+                    color = "red",
+                    width = 12
+                )
+            })
+            
+            # Filter the lift most data to most reps, render the value box
+            output$most_reps <- renderValueBox({
+                details <- lift_mosts %>% filter(category == 'most_reps')
+                subtitle <- strftime(details$workout_date, "%m/%d/%Y")
+                value <- glue(
+                    "{details$repetitions} reps at {details$weight} lbs"
+                )
+
+                valueBox(
+                    value = value,
+                    subtitle = subtitle,
+                    icon = icon("hashtag"),
+                    color = "red",
+                    width = 12
+                )
+            })
+            
+            # Pop the modal
+            toggleModal(
+                session = session,
+                modalId = "lift_info_modal",
+                toggle = "open"
+            )
+        }
+    )
     
     #### Workout Summary UI ====================================================
     observeEvent(
