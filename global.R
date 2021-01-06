@@ -19,25 +19,26 @@ library(shinyjs)
 library(shinyWidgets)
 library(stringr)
 library(tidyr)
-library(tuneR)
+# library(tuneR)
 library(waiter)
 
 plan(callr)
 
-source(here("www", "misc_pages.R"))
-source(here("www", "theme.R"))
-source(here("www", "db.R"))
-source(here("www", "smart_house.R"))
+source(here::here("www", "misc_pages.R"))
+source(here::here("www", "theme.R"))
+source(here::here("www", "db.R"))
+source(here::here("www", "smart_house.R"))
 
-for (tab_dir in list.files(here("www", "tabs"))){
-    for (r_file in list.files(here("www", "tabs", tab_dir), pattern = "*.R")) {
-        source(here("www", "tabs", tab_dir, r_file))
+for (tab_dir in list.files(here::here("www", "tabs"))){
+    for (r_file in list.files(here::here("www", "tabs", tab_dir), pattern = "*.R")) {
+        source(here::here("www", "tabs", tab_dir, r_file))
     }
 }
 
-app_config <- config::get(config = "default", file = here("config.yaml"))
+app_config <- config::get(config = "default", file = here::here("config.yaml"))
 db_con = DBI::dbConnect(
-    drv = RPostgres::Postgres(),
+    # drv = RPostgres::Postgres(),
+    drv = RPostgreSQL::PostgreSQL(),
     dbname = app_config$dbname,
     host = app_config$host,
     port = app_config$port,

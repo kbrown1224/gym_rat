@@ -1,29 +1,53 @@
-insert_wo_template <- readr::read_file(
-    here("www", "tabs", "workout", "insert_workout.sql")
+read_file <- function(filepath){
+  con = file(filepath, "r")
+  sql.string <- ""
+
+  while (TRUE){
+    line <- readLines(con, n = 1)
+
+    if ( length(line) == 0 ){
+      break
+    }
+
+    line <- gsub("\\t", " ", line)
+
+    if(grepl("--",line) == TRUE){
+      line <- paste(sub("--","/*",line),"*/")
+    }
+
+    sql.string <- paste(sql.string, line)
+  }
+
+  close(con)
+  return(sql.string)
+}
+
+insert_wo_template <- read_file(
+   here::here("www", "tabs", "workout", "insert_workout.sql")
 )
 
-update_workout_number <- readr::read_file(
-    here("www", "tabs", "workout", "update_workout_number.sql")
+update_workout_number <- read_file(
+    here::here("www", "tabs", "workout", "update_workout_number.sql")
 )
 
-lift_insert_template <- readr::read_file(
-    here("www", "tabs", "workout", "lift_insert.sql")
+lift_insert_template <- read_file(
+    here::here("www", "tabs", "workout", "lift_insert.sql")
 )
 
-set_insert_template <- readr::read_file(
-    here("www", "tabs", "workout", "set_insert.sql")
+set_insert_template <- read_file(
+    here::here("www", "tabs", "workout", "set_insert.sql")
 )
 
-update_end_dttm_template <- readr::read_file(
-    here("www", "tabs", "workout", "update_end_dttm.sql")
+update_end_dttm_template <- read_file(
+    here::here("www", "tabs", "workout", "update_end_dttm.sql")
 )
 
-past_exercise_template <- readr::read_file(
-    here("www", "tabs", "workout", "past_exercise_summary.sql")
+past_exercise_template <- read_file(
+    here::here("www", "tabs", "workout", "past_exercise_summary.sql")
 )
 
-lift_mosts_template <- readr::read_file(
-    here("www", "tabs", "workout", "lift_mosts.sql")
+lift_mosts_template <- read_file(
+    here::here("www", "tabs", "workout", "lift_mosts.sql")
 )
 
 get_last_workouts <- function (con) {

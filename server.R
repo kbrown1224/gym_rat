@@ -268,7 +268,7 @@ function(input, output, session) {
                 # Swap the UIs and play a fun little message
                 shinyjs::hide("choose_workout_ui")
                 shinyjs::show("workout_ui")
-                future({system(glue('aplay -t wav {here("www", "gl.wav")}'))})
+                # future({system(glue('aplay -t wav {here("www", "gl.wav")}'))})
                 future({set_fan_status("On")})
                 
             } else {
@@ -349,7 +349,7 @@ function(input, output, session) {
         handlerExpr = {
             if (input$confirm_end) {
                 # Async beep so it doesn't block progress
-                future({beepr::beep(8)})
+                # future({beepr::beep(8)})
                 
                 # This wasn't working if I simply used global$lifts, idk why, 
                 # still needs some research.
